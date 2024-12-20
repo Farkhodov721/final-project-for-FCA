@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-map Generator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f7fafd;
+            animation: fadeInBody 1s ease-in-out;
+        }
+
+        @keyframes fadeInBody {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .card {
+            margin-top: 20px;
+            border: 2px solid #a5c9ea;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+            animation: dropInCard 0.8s ease-in-out;
+        }
+
+        @keyframes dropInCard {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        table {
+            margin-top: 30px;
+            border: 2px solid #b2d9b3;
+            animation: fadeInTable 1s ease-in-out;
+        }
+
+        @keyframes fadeInTable {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .kmap-header {
+            background-color: #eef2c8;
+            font-weight: bold;
+            border: 2px solid #d1e8b9;
+            animation: pulseHeader 2s infinite;
+        }
+
+        @keyframes pulseHeader {
+            0%, 100% {
+                background-color: #eef2c8;
+            }
+            50% {
+                background-color: #f7f9e7;
+            }
+        }
+
+        th, td {
+            text-align: center;
+            vertical-align: middle;
+            font-size: 1.1em;
+        }
+
+        td {
+            background-color: #eaf5ea;
+            border: 2px solid #b2d9b3;
+        }
+
+        .result-expression {
+            margin-top: 20px;
+            font-weight: bold;
+            color: #5b875c;
+            background-color: #edf7ed;
+            border: 1px solid #9bc59b;
+            padding: 10px;
+            border-radius: 10px;
+            animation: highlightExpression 1.5s ease-in-out;
+        }
+
+        @keyframes highlightExpression {
+            from {
+                background-color: #d7eccd;
+            }
+            to {
+                background-color: transparent;
+            }
+        }
+
+        button:hover {
+            animation: buttonHover 0.5s ease-in-out;
+        }
+
+        @keyframes buttonHover {
+            from {
+                transform: scale(1);
+            }
+            to {
+                transform: scale(1.02);
+            }
+        }
+
+        button {
+            background-color: #88c6e3;
+            border-color: #66a5c8;
+            color: white;
+        }
+
+        button:hover {
+            background-color: #66a5c8;
+            color: #f7fafd;
+        }
+    </style>
+</head>
+<body class="container py-5">
+
+<!-- Page Header -->
+<div class="text-center mb-4">
+    <h1 style="color: #5b87a3;">K-map Generator</h1>
+    <p class="text-muted">Select the number of variables, populate the fields, and generate the K-map.</p>
+</div>
+
+<!-- Input Form -->
+<div class="card mx-auto p-4" style="max-width: 700px;">
+    <form method="POST" action="/" id="kmap-form">
+        <!-- Select Number of Variables -->
+        <div class="mb-3">
+            <label for="num_variables" class="form-label" style="color: #6c8d89;">Number of Variables</label>
+            <select id="num_variables" name="num_variables" class="form-select" onchange="generateInputs()" required>
+                <option value="" disabled selected>Select...</option>
+                <option value="2" {% if num_variables== 2 %}selected{% endif %}>2 Variables</option>
+                <option value="3" {% if num_variables== 3 %}selected{% endif %}>3 Variables</option>
+                <option value="4" {% if num_variables== 4 %}selected{% endif %}>4 Variables</option>
+            </select>
+        </div>
+
+        <!-- Dynamic Input Fields for K-map cells -->
+        <div id="input-fields" class="mb-3">
+            {% if num_variables %}
+            {% for i in range(2**num_variables) %}
+            <div class="mb-2">
+                <label for="cell_{{ i }}" class="form-label" style="color: #799c7d;">Cell value for position {{ i + 1
+                    }}</label>
+                <input
+                        type="number"
+                        id="cell_{{ i }}"
+                        name="cell_{{ i }}"
+                        class="form-control"
+                        min="0"
+                        max="1"
+                        required
+                        value="{{ cell_values[i] if cell_values else '' }}"
+                >
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary w-100">Generate K-map</button>
+    </form>
+</div>
+
+{% if kmap_matrix %}
+<!-- K-map Results: Visible Only After Submission -->
+<div class="card mx-auto mt-4 p-4" style="max-width: 700px;">
+    <h2 class="text-center" style="color: #8c6565;">Generated K-map</h2>
+    <table class="table table-bordered">
+        <thead>
+        <tr>
+            <th class="kmap-header">{{ "A \\ B" if num_variables == 2 else "A \\ BC" if num_variables == 3 else "AB \\
+                CD" }}
+            </th>
+            {% for col_label in cols %}
+            <th class="kmap-header">{{ col_label }}</th>
+            {% endfor %}
+        </tr>
+        </thead>
+        <tbody>
+        {% for row_label, row_data in zip(rows, kmap_matrix) %}
+        <tr>
+            <th class="kmap-header">{{ row_label }}</th>
+            {% for cell in row_data %}
+            <td>{{ cell }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Display Boolean Expression -->
+    <h4 style="color: #5b745b;">Generated Boolean Expression:</h4>
+    <p class="text-success result-expression">{{ boolean_expression }}</p>
+</div>
+{% endif %}
+
+<script>
+    // JavaScript to dynamically create K-map input fields
+    function generateInputs() {
+        const numVariables = document.getElementById("num_variables").value;
+        const inputFieldsDiv = document.getElementById("input-fields");
+        inputFieldsDiv.innerHTML = ""; // Clear existing fields
+
+        if (numVariables) {
+            const fieldCount = Math.pow(2, numVariables); // Cells = 2^variables
+            for (let i = 0; i < fieldCount; i++) {
+                const div = document.createElement("div");
+                div.className = "mb-2";
+
+                const label = document.createElement("label");
+                label.setAttribute("for", `cell_${i}`);
+                label.className = "form-label";
+                label.style.color = "#799c7d";
+                label.innerText = `Cell value for position ${i + 1}:`;
+
+                const input = document.createElement("input");
+                input.type = "number";
+                input.id = `cell_${i}`;
+                input.name = `cell_${i}`;
+                input.className = "form-control";
+                input.min = "0";
+                input.max = "1";
+                input.required = true;
+
+                div.appendChild(label);
+                div.appendChild(input);
+                inputFieldsDiv.appendChild(div);
+            }
+        }
+    }
+</script>
+</body>
+</html>
